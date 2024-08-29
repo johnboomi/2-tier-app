@@ -46,6 +46,8 @@ pipeline {
                     def awsRegion = 'us-east-1' // Replace with your desired AWS region
                     def ecrRepoName = 'secops' // Replace with your ECR repository name
                     def ecrUrl = "590183914488.dkr.ecr.${awsRegion}.amazonaws.com/${ecrRepoName}"
+                    // Use AWS credentials stored in Jenkins
+                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
                     // Get ECR login credentials and log in to ECR
                     sh "aws ecr get-login-password --region ${awsRegion} | docker login --username AWS --password-stdin ${ecrUrl}"
                     // Tag the Docker image with the ECR repository URL
