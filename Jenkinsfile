@@ -4,35 +4,54 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git 'https://github.com/YOUR_USERNAME/todo-app.git'
+                git 'https://github.com/johnboomi/2-tier-app.git'
             }
         }
         stage('Build') {
             steps {
                 script {
-                    sh 'docker build -t todo-app .'
+                    sh 'docker build -f todo-app -t Dockerfile .'
                 }
             }
         }
         stage('Test') {
             steps {
-                // Add test steps here, if any.
+                // Install Dependencies
+                sh 'npm install'
+                
+               // Run tests
+                sh 'npm test'
             }
         }
         stage('Security Check') {
             steps {
                 script {
-                    // Snyk or other security tool command here.
+                    // Install Snyk if not already installed
+                    sh 'npm install -g snyk'
+                    // Authenticate with Snyk (ensure you have your Snyk token set up in Jenkins credentials)
+                    withCredentials([string(credentialsId: 'snyk-token', variable: 'SNYK_TOKEN')]) {
+                        sh 'snyk auth $SNYK_TOKEN'
+                    }
+                    // Run Snyk test to check for vulnerabilities in project dependencies
+                    sh 'snyk test'
+                    // (Optional) Monitor project for Snyk dashboard
+                    sh 'snyk monitor'
                 }
             }
         }
         stage('Push Image') {
             steps {
                 script {
-                    withCredentials([string(credentialsId: 'dockerhub-pass', variable: 'DOCKER_PASS')]) {
-                        sh 'docker login -u YOUR_DOCKER_USERNAME -p $DOCKER_PASS'
-                        sh 'docker tag todo-app YOUR_DOCKER_USERNAME/todo-app:latest'
-                        sh 'docker push YOUR_DOCKER_USERNAME/todo-app:latest'
+                    // Define your AWS Region and ECR repository name
+                    def awsRegion = 'us-east-1' // Replace with your desired AWS region
+                    def ecrRepoName = 'secops' // Replace with your ECR repository name
+                    def ecrUrl = "590183914488.dkr.ecr.${awsRegion}.amazonaws.com/${ecrRepoName}"
+                    // Get ECR login credentials and log in to ECR
+                    sh "aws ecr get-login-password --region ${awsRegion} | docker login --username AWS --password-stdin ${ecrUrl}"
+                    // Tag the Docker image with the ECR repository URL
+                    sh "docker tag todo-app:latest ${ecrUrl}:latest"
+                    // Push the Docker image to the ECR repository
+                    sh "docker push ${ecrUrl}:latest"
                     }
                 }
             }
