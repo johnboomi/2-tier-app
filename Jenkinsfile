@@ -29,7 +29,7 @@ pipeline {
                     // Install Snyk if not already installed
                     sh 'npm install -g snyk'
                     // Authenticate with Snyk (ensure you have your Snyk token set up in Jenkins credentials)
-                    withCredentials([string(credentialsId: 'snyk-token', variable: 'SNYK_TOKEN')]) {
+                    withCredentials([string(credentialsId: 'snyk-token', variable: '75383fc9-39fe-48bf-83ce-41da7cc41c60')]) {
                         sh 'snyk auth $SNYK_TOKEN'
                     }
                     // Run Snyk test to check for vulnerabilities in project dependencies
