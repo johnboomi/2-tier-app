@@ -4,66 +4,70 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git 'https://github.com/johnboomi/2-tier-app.git'
+                checkout([$class: 'GitSCM', branches: [[name: '*/main']],
+                          userRemoteConfigs: [[url: 'https://github.com/johnboomi/2-tier-app.git',
+                                               credentialsId: 'your-credentials-id']]])
             }
         }
         stage('Build') {
             steps {
                 script {
-                    sh 'docker build -f todo-app -t Dockerfile .'
+                    // Correct the Docker build command to specify the Dockerfile and the context
+                    sh 'docker build -t todo-app -f Dockerfile .'
                 }
             }
         }
         stage('Test') {
             steps {
-                // Install Dependencies
-                sh 'npm install'
-                
-               // Run tests
-                sh 'npm test'
+                script {
+                    // Ensure the directory is correct if 'npm install' needs to be run in a specific folder
+                    sh 'npm install'
+                    sh 'npm test'
+                }
             }
         }
         stage('Security Check') {
             steps {
                 script {
-                    // Install Snyk if not already installed
+                    // Install Snyk and authenticate
                     sh 'npm install -g snyk'
-                    // Authenticate with Snyk (ensure you have your Snyk token set up in Jenkins credentials)
-                    withCredentials([string(credentialsId: 'snyk-token', variable: '75383fc9-39fe-48bf-83ce-41da7cc41c60')]) {
+                    withCredentials([string(credentialsId: 'snyk-token', variable: 'SNYK_TOKEN')]) {
                         sh 'snyk auth $SNYK_TOKEN'
                     }
-                    // Run Snyk test to check for vulnerabilities in project dependencies
+                    // Run Snyk security tests
                     sh 'snyk test'
-                    // (Optional) Monitor project for Snyk dashboard
-                    sh 'snyk monitor'
+                    sh 'snyk monitor' // Optional
                 }
             }
         }
         stage('Push Image') {
             steps {
                 script {
-                    // Define your AWS Region and ECR repository name
-                    def awsRegion = 'us-east-1' // Replace with your desired AWS region
-                    def ecrRepoName = 'secops' // Replace with your ECR repository name
+                    // Define AWS region and ECR repository name
+                    def awsRegion = 'us-east-1'
+                    def ecrRepoName = 'secops'
                     def ecrUrl = "590183914488.dkr.ecr.${awsRegion}.amazonaws.com/${ecrRepoName}"
-                    // Use AWS credentials stored in Jenkins
-                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
-                    // Get ECR login credentials and log in to ECR
+                    // Authenticate with AWS ECR
                     sh "aws ecr get-login-password --region ${awsRegion} | docker login --username AWS --password-stdin ${ecrUrl}"
-                    // Tag the Docker image with the ECR repository URL
+                    // Tag and push the Docker image
                     sh "docker tag todo-app:latest ${ecrUrl}:latest"
-                    // Push the Docker image to the ECR repository
                     sh "docker push ${ecrUrl}:latest"
-                    }
                 }
             }
         }
         stage('Deploy to EKS') {
             steps {
-                script {
-                    sh 'kubectl apply -f k8s/deployment.yaml'
-                    sh 'kubectl apply -f k8s/service.yaml'
+                withKubeConfig([credentialsId: 'kubelogin']) {
+                    script {
+                        sh 'kubectl apply -f k8s/deployment.yaml'
+                        sh 'kubectl apply -f k8s/service.yaml'
+                    }
                 }
+            }
+        }
+        stage('Clean Workspace') {
+            steps {
+                cleanWs()
             }
         }
     }
