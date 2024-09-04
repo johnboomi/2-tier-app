@@ -4,65 +4,69 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                checkout([$class: 'GitSCM', branches: [[name: '*/main']],
-                          userRemoteConfigs: [[url: 'https://github.com/johnboomi/2-tier-app.git',
-                                               credentialsId: 'your-credentials-id']]])
+                git branch: 'main', url: 'https://github.com/johnboomi/2-tier-app.git'
+                credentialsId: 'git-credentials' // Replace with your actual credentials ID
             }
         }
         stage('Build') {
             steps {
                 script {
-                    // Correct the Docker build command to specify the Dockerfile and the context
-                    sh 'docker build -t todo-app -f Dockerfile .'
+                    sh 'docker build -f todo-app -t Dockerfile .'
                 }
             }
         }
         stage('Test') {
             steps {
-                script {
-                    // Ensure the directory is correct if 'npm install' needs to be run in a specific folder
-                    sh 'npm install'
-                    sh 'npm test'
-                }
+                // Install Dependencies
+                sh 'npm install'
+                
+               // Run tests
+                sh 'npm test'
             }
         }
         stage('Security Check') {
             steps {
                 script {
-                    // Install Snyk and authenticate
+                    // Install Snyk if not already installed
                     sh 'npm install -g snyk'
-                    withCredentials([string(credentialsId: 'snyk-token', variable: 'SNYK_TOKEN')]) {
+                    // Authenticate with Snyk (ensure you have your Snyk token set up in Jenkins credentials)
+                    withCredentials([string(credentialsId: 'snyk-token', variable: '75383fc9-39fe-48bf-83ce-41da7cc41c60')]) {
                         sh 'snyk auth $SNYK_TOKEN'
                     }
-                    // Run Snyk security tests
+                    // Run Snyk test to check for vulnerabilities in project dependencies
                     sh 'snyk test'
-                    sh 'snyk monitor' // Optional
+                    // (Optional) Monitor project for Snyk dashboard
+                    sh 'snyk monitor'
                 }
             }
         }
         stage('Push Image') {
             steps {
                 script {
-                    // Define AWS region and ECR repository name
-                    def awsRegion = 'us-east-1'
-                    def ecrRepoName = 'secops'
+                    // Define your AWS Region and ECR repository name
+                    def awsRegion = 'us-east-1' // Replace with your desired AWS region
+                    def ecrRepoName = 'secops' // Replace with your ECR repository name
                     def ecrUrl = "590183914488.dkr.ecr.${awsRegion}.amazonaws.com/${ecrRepoName}"
-                    // Authenticate with AWS ECR
+                    // Get ECR login credentials and log in to ECR
                     sh "aws ecr get-login-password --region ${awsRegion} | docker login --username AWS --password-stdin ${ecrUrl}"
-                    // Tag and push the Docker image
+                    // Tag the Docker image with the ECR repository URL
                     sh "docker tag todo-app:latest ${ecrUrl}:latest"
+                    // Push the Docker image to the ECR repository
                     sh "docker push ${ecrUrl}:latest"
+                    }
                 }
             }
         }
-        stage('Deploy to EKS') {
+        stage('Deploy') {
             steps {
                 withKubeConfig([credentialsId: 'kubelogin']) {
                     script {
-                        sh 'kubectl apply -f k8s/deployment.yaml'
-                        sh 'kubectl apply -f k8s/service.yaml'
-                    }
+                    sh 'kubectl apply -f k8s/deployment.yaml'
+                    sh 'kubectl apply -f k8s/service.yaml'
                 }
+
+                }
+                
             }
         }
         stage('Clean Workspace') {
@@ -71,4 +75,3 @@ pipeline {
             }
         }
     }
-}
