@@ -3,9 +3,12 @@ pipeline {
 
     stages {
         stage('Checkout') {
-            steps {
-                git branch: 'main', url: 'https://github.com/johnboomi/2-tier-app.git'
-                credentialsId: 'git-credentials' // Replace with your actual credentials ID
+            steps{
+                git (
+                  branch: 'main',
+                  url: 'https://github.com/johnboomi/2-tier-app.git',
+                  credentialsId: 'git-credentials' // Replace with your actual credentials ID  
+                )
             }
         }
         stage('Build') {
