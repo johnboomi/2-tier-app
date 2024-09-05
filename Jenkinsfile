@@ -15,7 +15,7 @@ pipeline {
         stage('Build') {
             steps {
                 script {
-                    sh 'docker build -f todo-app -t Dockerfile .'
+                    sh 'docker build -f Dockerfile -t todo-app .'
                 }
             }
         }
