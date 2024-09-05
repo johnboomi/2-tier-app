@@ -2,15 +2,6 @@ pipeline {
     agent any
 
     stages {
-        stage('Initialize') {
-            steps {
-                script {
-                    // Set the system property
-                    System.setProperty("org.jenkinsci.plugins.durabletask.BourneShellScript.HEARTBEAT_CHECK_INTERVAL", "3800")
-                }
-            }
-        }
-
         stage('Checkout') {
             steps {
                 git(
@@ -24,7 +15,7 @@ pipeline {
         stage('Build') {
             steps {
                 script {
-                    sh 'docker build -f Dockerfile -t todo-app .'
+                    sh 'docker build -f todo-app -t Dockerfile .'
                 }
             }
         }
